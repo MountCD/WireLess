@@ -193,7 +193,14 @@ Proxy configs saved: 3
 sudo wireless stop
 ```
 
-### 7. Удалить конфиг
+### 7. Перезапустить
+
+```bash
+sudo wireless restart              # сохраняет последний server IP
+sudo wireless restart --server-ip 1.2.3.4
+```
+
+### 8. Удалить конфиг
 
 ```bash
 wireless remove MyReality

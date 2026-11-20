@@ -9,7 +9,8 @@ WireLess — CLI-конфигуратор WireGuard-шлюза: трафик к�
 
 ```bash
 python3 -m wireless.cli --help              # запуск из исходников, install не нужен
-python3 -m compileall -q wireless           # единственная авто-проверка: тестов, lint и CI нет
+python3 -m compileall -q wireless           # синтаксис
+python3 -m pytest -q                        # тесты (pip install -e '.[dev]'), без root и сети
 pip install -e .                            # на Arch: pip install --break-system-packages -e .
 ```
 
@@ -37,28 +38,31 @@ mangle-цепочка `WIRELESS_PROXY` с TPROXY, `ip rule fwmark 1 table 100`,
 
 Поток: URL → `wireless/parsers/*` → dataclass из `wireless/models.py` →
 `wireless/generators/{singbox,wireguard}.py` (dict/текст) →
-`wireless/managers/*` (subprocess, PID, iptables) → `wireless/cli.py`
-(JSON-состояние).
+`wireless/services.py` (операции, состояние) → `wireless/managers/*`
+(subprocess, PID, iptables) → `wireless/cli.py` (аргументы и вывод).
 
 - Entry point — `wireless = wireless.cli:main`; новые команды добавляются в
-  `wireless/cli.py`.
-- Состояние: `/etc/wireless/configs.json` (список конфигов) и `state.json`
-  (`active`, `running`, `server_ip`). В сохранённом dict есть `_type`, потому что
+  `wireless/cli.py` и вызывают методы `GatewayService` из
+  `wireless/services.py`.
+- Состояние: `/etc/wireless/configs.json` (список конфигов), `state.json`
+  (`active`, `running`, `server_ip`), `subscriptions.json` (пока не
+  используется, задел под подписки). В сохранённом dict есть `_type`, потому что
   поле `type` перезаписывается в `__post_init__`; незнакомые ключи при загрузке
-  отбрасываются.
+  отбрасываются. Служебные ключи `_url`/`_source` тоже отбрасываются.
+- Запись состояния — только через `wireless/store.py` (`Store`): атомарная
+  замена файла + `flock`, права `0600`, каталоги `0700`. Не писать JSON напрямую.
 - Новый протокол: dataclass → парсер → `parsers/auto._PARSERS` →
-  `generators/singbox._OUTBOUND_BUILDERS` → `wireless.cli._dict_to_proxy_config`.
-- Логика живёт в parsers/generators/managers; `wireless/cli.py` — только
-  аргументы, JSON и вывод. Для будущего web UI state-хелперы придётся вынести
-  из `wireless/cli.py`.
+  `generators/singbox._OUTBOUND_BUILDERS` → `services._PROXY_TYPES`.
+- `wireless/cli.py` — только click-аргументы и форматирование; вся логика в
+  `parsers/generators/managers/services`. Исключения: `ValueError` (парсинг),
+  `NotFoundError`/`ConflictError`/`ServiceError` (операции), `RuntimeError`
+  (окружение).
 - `PKGBUILD` перечисляет файлы вручную (`source`, `prepare`, `check`), списки
   `py_compile` дублируются в `install.sh` и `install-arch.sh` — новый `.py`
   добавляйте во все места (путь CLI теперь `wireless/cli.py`).
 
 ## Грабли
 
-- `wireless restart` отсутствует, хотя `wireless.service` вызывает его в
-  `ExecReload` — `systemctl reload wireless` падает.
 - TPROXY-правила заданы дважды: PostUp/PostDown в `generators/wireguard.py` и
   `managers/routing.py`. Менять синхронно.
 - `SINGBOX_BINARY` ищется так: env → `PATH` (`shutil.which`) →

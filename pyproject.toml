@@ -9,11 +9,17 @@ dependencies = [
     "qrcode[pil]>=7.4",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
 [project.scripts]
 wireless = "wireless.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["wireless*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [build-system]
 requires = ["setuptools>=61"]

@@ -45,6 +45,8 @@ source=(
     "wireless-cli=wireless/cli.py"
     "wireless-config=wireless/config.py"
     "wireless-models=wireless/models.py"
+    "wireless-store=wireless/store.py"
+    "wireless-services=wireless/services.py"
     "wireless-init=wireless/__init__.py"
     # parsers
     "wireless-parsers-init=wireless/parsers/__init__.py"
@@ -73,7 +75,7 @@ sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
             'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
             'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
             'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
-            'SKIP')
+            'SKIP' 'SKIP' 'SKIP')
 
 # ─── NOTE ────────────────────────────────────────────────────────────────────
 # For AUR publishing replace source/sha256sums above with the GitHub tarball
@@ -94,6 +96,8 @@ prepare() {
     cp "${srcdir}/requirements.txt"           "${S}/requirements.txt"
     cp "${srcdir}/wireless-config"            "${S}/wireless/config.py"
     cp "${srcdir}/wireless-models"            "${S}/wireless/models.py"
+    cp "${srcdir}/wireless-store"             "${S}/wireless/store.py"
+    cp "${srcdir}/wireless-services"          "${S}/wireless/services.py"
     cp "${srcdir}/wireless-init"              "${S}/wireless/__init__.py"
     cp "${srcdir}/wireless-parsers-init"      "${S}/wireless/parsers/__init__.py"
     cp "${srcdir}/wireless-parsers-base"      "${S}/wireless/parsers/base.py"
@@ -126,6 +130,9 @@ check() {
         wireless/generators/singbox.py \
         wireless/generators/wireguard.py \
         wireless/models.py \
+        wireless/store.py \
+        wireless/services.py \
+        wireless/config.py \
         wireless/cli.py
     python -c "from wireless.cli import main"
 }
