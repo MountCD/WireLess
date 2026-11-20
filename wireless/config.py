@@ -102,6 +102,7 @@ STATE_FILE         = "/etc/wireless/state.json"
 CONFIGS_FILE       = "/etc/wireless/configs.json"
 SUBSCRIPTIONS_FILE = "/etc/wireless/subscriptions.json"
 LOCK_FILE          = "/etc/wireless/.lock"
+WEB_FILE           = "/etc/wireless/web.json"
 
 # ── Routing / networking ─────────────────────────────────────────────────────
 ROUTE_TABLE    = 100

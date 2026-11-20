@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}WireLess — вход{% endblock %}
+{% block body %}
+<main class="login">
+  <form id="login-form" class="login-card" autocomplete="on">
+    <h1>WireLess</h1>
+    <p class="muted">Вход в панель управления шлюзом</p>
+    <label for="password">Пароль</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+    <p id="login-error" class="error" hidden></p>
+    <button type="submit">Войти</button>
+  </form>
+</main>
+{% endblock %}

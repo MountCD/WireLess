@@ -50,7 +50,7 @@ def _read_json(path: Path, default: Any) -> Any:
         raise StoreError(f"Corrupted state file {path}: {exc}") from exc
 
 
-def _atomic_write_json(path: Path, data: Any, mode: int = FILE_MODE) -> None:
+def atomic_write_json(path: Path, data: Any, mode: int = FILE_MODE) -> None:
     """Write *data* as JSON to *path* atomically with the given file mode."""
     _ensure_dir(path.parent)
     fd, tmp_name = tempfile.mkstemp(
@@ -150,7 +150,7 @@ class Store:
 
     def save_configs(self, configs: list[dict]) -> None:
         """Atomically replace the saved proxy configs."""
-        _atomic_write_json(self.configs_path, configs)
+        atomic_write_json(self.configs_path, configs)
 
     # ── State ────────────────────────────────────────────────────────────────
 
@@ -165,7 +165,7 @@ class Store:
 
     def save_state(self, state: dict) -> None:
         """Atomically replace the gateway state."""
-        _atomic_write_json(self.state_path, state)
+        atomic_write_json(self.state_path, state)
 
     def update_state(self, **changes: Any) -> dict:
         """Merge *changes* into the state under the lock and return the result.
@@ -195,4 +195,4 @@ class Store:
 
     def save_subscriptions(self, subscriptions: list[dict]) -> None:
         """Atomically replace the saved subscriptions."""
-        _atomic_write_json(self.subscriptions_path, subscriptions)
+        atomic_write_json(self.subscriptions_path, subscriptions)
