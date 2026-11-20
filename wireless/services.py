@@ -8,6 +8,7 @@ into exit codes or HTTP statuses.
 """
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import logging
 import socket
@@ -82,6 +83,30 @@ def config_name(config: dict) -> str:
     return config.get("name") or config.get("_name") or ""
 
 
+# Fields that must never leave the server in clear text.
+SECRET_FIELDS = ("uuid", "password", "auth", "obfs_password")
+MASK = "••••"
+
+
+def public_config(config: dict, reveal: bool = False) -> dict:
+    """Return a copy of *config* that is safe to send to the web UI.
+
+    Service keys (``_url``, ``_source``) are dropped because the URL embeds
+    credentials, and secret fields are masked unless *reveal* is true.
+    """
+    data = {
+        key: value
+        for key, value in config.items()
+        if key not in ("_url", "_source")
+    }
+    data["name"] = config_name(config)
+    if not reveal:
+        for field in SECRET_FIELDS:
+            if data.get(field):
+                data[field] = MASK
+    return data
+
+
 # ── Service ──────────────────────────────────────────────────────────────────
 
 class GatewayService:
@@ -106,6 +131,16 @@ class GatewayService:
         self._op_lock = threading.RLock()
 
     # ── Managers ─────────────────────────────────────────────────────────────
+
+    @contextlib.contextmanager
+    def _operation(self):
+        """Serialise gateway operations; fail fast when one is already running."""
+        if not self._op_lock.acquire(blocking=False):
+            raise ConflictError("Another gateway operation is in progress.")
+        try:
+            yield
+        finally:
+            self._op_lock.release()
 
     @property
     def singbox(self) -> SingBoxManager:
@@ -140,6 +175,15 @@ class GatewayService:
             if config_name(config) == active:
                 return config
         return None
+
+    def preview_proxy(self, url: str) -> dict:
+        """Parse *url* without saving and return its public representation.
+
+        Raises:
+            ValueError: If the URL cannot be parsed.
+        """
+        proxy = parse_proxy_url(url)
+        return public_config(proxy_to_dict(proxy), reveal=True)
 
     def add_proxy(self, url: str, name: str = "") -> dict:
         """Parse *url*, save the config and return it.
@@ -251,7 +295,7 @@ class GatewayService:
             ValueError: If the active config cannot be reconstructed.
             RuntimeError: If sing-box or WireGuard fails to start.
         """
-        with self._op_lock:
+        with self._operation():
             config = self.get_active_config()
             if config is None:
                 raise ConflictError(
@@ -298,7 +342,7 @@ class GatewayService:
         Returns:
             Dict describing which components were actually stopped.
         """
-        with self._op_lock:
+        with self._operation():
             stopped = {"routing": False, "singbox": False, "wireguard": False}
             if self.routing.is_active():
                 self.routing.teardown()
@@ -314,7 +358,7 @@ class GatewayService:
 
     def restart(self, server_ip: str = "") -> dict:
         """Stop and start the gateway, keeping the previous server IP."""
-        with self._op_lock:
+        with self._operation():
             previous_ip = self.store.load_state().get("server_ip", "")
             self.stop()
             return self.start(server_ip or previous_ip)

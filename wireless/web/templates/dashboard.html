@@ -1,13 +1,7 @@
 {% extends "base.html" %}
 {% block title %}WireLess — статус{% endblock %}
 {% block body %}
-<header class="topbar">
-  <h1>WireLess</h1>
-  <div class="topbar-actions">
-    <span id="updated" class="muted"></span>
-    <button id="logout" class="ghost" type="button">Выйти</button>
-  </div>
-</header>
+{% include "_topbar.html" %}
 
 <main class="content">
   <section class="cards">
@@ -30,6 +24,17 @@
   </section>
 
   <section class="panel">
+    <h2>Управление шлюзом</h2>
+    <div class="actions">
+      <button type="button" data-gateway="start">Запустить</button>
+      <button type="button" class="ghost" data-gateway="stop">Остановить</button>
+      <button type="button" class="ghost" data-gateway="restart">Перезапустить</button>
+    </div>
+    <p id="status-error" class="error" hidden></p>
+    <p class="muted small">Изменения активного конфига применяются при следующем запуске или перезапуске.</p>
+  </section>
+
+  <section class="panel">
     <h2>Компоненты</h2>
     <div class="row">
       <span>WireGuard</span>
@@ -47,8 +52,7 @@
       <span class="muted">Бинарник sing-box</span>
       <span id="sb-binary" class="mono">—</span>
     </div>
+    <p id="updated" class="muted small"></p>
   </section>
-
-  <p id="status-error" class="error" hidden></p>
 </main>
 {% endblock %}

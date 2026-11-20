@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from wireless.services import public_config
 from wireless.web.deps import SESSION_COOKIE, require_csrf, require_session
 
 router = APIRouter()
@@ -11,6 +12,25 @@ router = APIRouter()
 class LoginRequest(BaseModel):
     password: str = ""
 
+
+class ProxyRequest(BaseModel):
+    url: str
+    name: str = ""
+
+
+class UrlRequest(BaseModel):
+    url: str
+
+
+class NameRequest(BaseModel):
+    name: str
+
+
+class GatewayRequest(BaseModel):
+    server_ip: str = ""
+
+
+# ── Health / auth ────────────────────────────────────────────────────────────
 
 @router.get("/health")
 async def health() -> dict:
@@ -55,6 +75,60 @@ async def logout():
     return response
 
 
+# ── Status ───────────────────────────────────────────────────────────────────
+
 @router.get("/status")
 async def status(request: Request, _=Depends(require_session)) -> dict:
     return request.app.state.service.status()
+
+
+# ── Proxies ──────────────────────────────────────────────────────────────────
+
+@router.get("/proxies")
+async def list_proxies(request: Request, _=Depends(require_session)) -> dict:
+    service = request.app.state.service
+    active = service.store.load_state().get("active") or None
+    return {
+        "active": active,
+        "configs": [public_config(config) for config in service.list_proxies()],
+    }
+
+
+@router.post("/proxies", dependencies=[Depends(require_csrf)])
+async def add_proxy(payload: ProxyRequest, request: Request) -> dict:
+    created = request.app.state.service.add_proxy(payload.url, payload.name)
+    return public_config(created)
+
+
+@router.post("/proxies/parse", dependencies=[Depends(require_csrf)])
+async def parse_proxy(payload: UrlRequest, request: Request) -> dict:
+    return request.app.state.service.preview_proxy(payload.url)
+
+
+@router.post("/proxies/activate", dependencies=[Depends(require_csrf)])
+async def activate_proxy(payload: NameRequest, request: Request) -> dict:
+    return {"active": request.app.state.service.activate(payload.name)}
+
+
+@router.delete("/proxies", dependencies=[Depends(require_csrf)])
+async def delete_proxy(request: Request, name: str) -> dict:
+    # The name travels as a query parameter: config names may contain "/" and
+    # would not survive a path parameter.
+    request.app.state.service.remove_proxy(name)
+    return {"ok": True}
+
+
+# ── Gateway lifecycle ────────────────────────────────────────────────────────
+
+@router.post("/gateway/{action}", dependencies=[Depends(require_csrf)])
+async def gateway(action: str, payload: GatewayRequest, request: Request) -> dict:
+    service = request.app.state.service
+    if action == "start":
+        result = service.start(payload.server_ip)
+    elif action == "stop":
+        result = service.stop()
+    elif action == "restart":
+        result = service.restart(payload.server_ip)
+    else:
+        raise HTTPException(status_code=404, detail="Unknown gateway action.")
+    return {"result": result, "status": service.status()}

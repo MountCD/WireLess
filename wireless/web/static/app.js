@@ -33,6 +33,8 @@
     element.dataset.state = ok ? "ok" : "bad";
   }
 
+  window.WireLess = { api, setState };
+
   function setupLogin() {
     const form = document.getElementById("login-form");
     if (!form) return;
@@ -53,6 +55,20 @@
     });
   }
 
+  function setupLogout() {
+    const button = document.getElementById("logout");
+    if (!button) return;
+
+    button.addEventListener("click", async () => {
+      try {
+        await api("/api/logout", { method: "POST" });
+      } catch (_) {
+        /* ignore: navigation below clears the page anyway */
+      }
+      window.location.assign("/login");
+    });
+  }
+
   function setupDashboard() {
     const active = document.getElementById("active");
     if (!active) return;
@@ -69,15 +85,12 @@
       updated: document.getElementById("updated"),
       error: document.getElementById("status-error"),
     };
+    const buttons = Array.from(document.querySelectorAll("[data-gateway]"));
 
-    document.getElementById("logout").addEventListener("click", async () => {
-      try {
-        await api("/api/logout", { method: "POST" });
-      } catch (_) {
-        /* the cookie is cleared server-side on success only */
-      }
-      window.location.assign("/login");
-    });
+    function showError(message) {
+      el.error.textContent = message;
+      el.error.hidden = false;
+    }
 
     async function refresh() {
       try {
@@ -105,15 +118,35 @@
           window.location.assign("/login");
           return;
         }
-        el.error.textContent = error.message;
-        el.error.hidden = false;
+        showError(error.message);
       }
     }
+
+    async function runGateway(action) {
+      if (action === "restart" && !window.confirm("Перезапустить шлюз? Трафик клиентов прервётся.")) {
+        return;
+      }
+      buttons.forEach((button) => { button.disabled = true; });
+      el.error.hidden = true;
+      try {
+        await api(`/api/gateway/${action}`, { method: "POST", body: {} });
+        await refresh();
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        buttons.forEach((button) => { button.disabled = false; });
+      }
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => runGateway(button.dataset.gateway));
+    });
 
     refresh();
     window.setInterval(refresh, 3000);
   }
 
   setupLogin();
+  setupLogout();
   setupDashboard();
 })();
