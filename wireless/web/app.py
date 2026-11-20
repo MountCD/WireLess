@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from wireless.services import GatewayService
+from wireless.services import ConflictError, GatewayService, NotFoundError, ServiceError
 from wireless.web.auth import LoginRateLimiter, WebAuth
 from wireless.web.routes import api, pages
 
@@ -92,4 +92,23 @@ def create_app(
 
     app.include_router(api.router, prefix="/api")
     app.include_router(pages.router)
+
+    @app.exception_handler(ServiceError)
+    async def service_error_handler(request: Request, exc: ServiceError):
+        if isinstance(exc, NotFoundError):
+            status_code = 404
+        elif isinstance(exc, ConflictError):
+            status_code = 409
+        else:
+            status_code = 400
+        return JSONResponse({"detail": str(exc)}, status_code=status_code)
+
+    @app.exception_handler(ValueError)
+    async def value_error_handler(request: Request, exc: ValueError):
+        return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    @app.exception_handler(RuntimeError)
+    async def runtime_error_handler(request: Request, exc: RuntimeError):
+        return JSONResponse({"detail": str(exc)}, status_code=500)
+
     return app

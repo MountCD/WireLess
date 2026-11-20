@@ -74,6 +74,15 @@ mangle-цепочка `WIRELESS_PROXY` с TPROXY, `ip rule fwmark 1 table 100`,
 - Страницы рендерятся Jinja2, данные тянет `web/static/app.js` через
   `/api/status`. Мутации требуют заголовок `X-CSRF-Token` (значение из
   `<meta name="csrf-token">`) и same-origin `Origin`.
+- API: `GET /api/status`, `GET|POST|DELETE /api/proxies`,
+  `POST /api/proxies/parse|activate`, `POST /api/gateway/{start|stop|restart}`.
+  Наружу отдаётся `services.public_config` — секреты замаскированы, `_url`
+  и `_source` вырезаны. Ошибки маппятся в 400/404/409/500 обработчиками
+  исключений в `web/app.py`.
+- Имя конфига может содержать `/`, поэтому удаление и активация передают его
+  query-параметром/в теле, а не в пути.
+- Параллельные операции шлюза сериализуются `GatewayService._operation()`:
+  лок неблокирующий, второй запрос получает `ConflictError` → 409.
 
 ## Грабли
 

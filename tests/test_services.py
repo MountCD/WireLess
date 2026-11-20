@@ -1,14 +1,18 @@
 """Tests for the shared service layer (no root, no network, no subprocesses)."""
+import threading
+
 import pytest
 
 from conftest import VLESS_URL
 from wireless.services import (
+    MASK,
     ConflictError,
     GatewayService,
     NotFoundError,
     config_name,
     dict_to_proxy_config,
     proxy_to_dict,
+    public_config,
 )
 
 
@@ -285,3 +289,73 @@ def test_proxy_to_dict_marks_type(service):
     assert saved["_type"] == "vless"
     assert saved["type"] == "vless"
     assert proxy_to_dict(dict_to_proxy_config(saved))["_type"] == "vless"
+
+
+# ── public representation ────────────────────────────────────────────────────
+
+def test_public_config_masks_secrets_and_drops_url(service):
+    saved = service.add_proxy(VLESS_URL)
+
+    public = public_config(saved)
+
+    assert public["uuid"] == MASK
+    assert public["name"] == "TestNode"
+    assert public["_type"] == "vless"
+    assert "_url" not in public
+    assert "_source" not in public
+
+
+def test_public_config_masks_trojan_password(service):
+    saved = service.add_proxy(
+        "trojan://secret-password@example.com:443?sni=example.com#Trojan"
+    )
+
+    assert public_config(saved)["password"] == MASK
+
+
+def test_public_config_can_reveal(service):
+    saved = service.add_proxy(VLESS_URL)
+
+    public = public_config(saved, reveal=True)
+
+    assert public["uuid"].startswith("11111111")
+
+
+def test_preview_proxy_does_not_save(service):
+    preview = service.preview_proxy(VLESS_URL)
+
+    assert preview["server"] == "example.com"
+    assert preview["port"] == 443
+    assert preview["_type"] == "vless"
+    assert service.list_proxies() == []
+
+
+def test_preview_proxy_rejects_broken_url(service):
+    with pytest.raises(ValueError):
+        service.preview_proxy("not-a-proxy")
+
+
+# ── concurrency ──────────────────────────────────────────────────────────────
+
+def test_concurrent_gateway_operation_conflicts(service):
+    service.add_proxy(VLESS_URL)
+    service.activate("TestNode")
+
+    started = threading.Event()
+    release = threading.Event()
+
+    def hold():
+        with service._operation():
+            started.set()
+            release.wait(5)
+
+    thread = threading.Thread(target=hold)
+    thread.start()
+    assert started.wait(2)
+
+    try:
+        with pytest.raises(ConflictError, match="in progress"):
+            service.start("1.2.3.4")
+    finally:
+        release.set()
+        thread.join()

@@ -189,3 +189,227 @@ def test_non_loopback_bind_requires_password():
 
 def test_unknown_host_is_not_loopback():
     assert check_bind("example.com", no_auth=False, configured=False)
+
+
+# ── Proxies ──────────────────────────────────────────────────────────────────
+
+from conftest import VLESS_URL
+from wireless.services import MASK
+
+
+def csrf_headers(client):
+    return {"X-CSRF-Token": login(client).json()["csrf"]}
+
+
+def add_proxy(client, url=VLESS_URL, name=""):
+    return client.post(
+        "/api/proxies",
+        json={"url": url, "name": name},
+        headers=csrf_headers(client),
+    )
+
+
+def test_proxies_requires_authentication(client):
+    assert client.get("/api/proxies").status_code == 401
+
+
+def test_add_and_list_proxies(client):
+    response = add_proxy(client)
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "TestNode"
+
+    listing = client.get("/api/proxies").json()
+    assert listing["active"] is None
+    assert len(listing["configs"]) == 1
+    assert listing["configs"][0]["uuid"] == MASK
+    assert listing["configs"][0]["_type"] == "vless"
+    assert "_url" not in listing["configs"][0]
+    assert "11111111" not in str(listing)
+
+
+def test_add_proxy_with_custom_name(client):
+    response = add_proxy(client, name="Custom")
+
+    assert response.json()["name"] == "Custom"
+
+
+def test_add_duplicate_proxy_returns_409(client):
+    add_proxy(client)
+
+    assert add_proxy(client).status_code == 409
+
+
+def test_add_broken_proxy_returns_400(client):
+    assert add_proxy(client, url="http://example.com").status_code == 400
+
+
+def test_parse_proxy_preview(client):
+    response = client.post(
+        "/api/proxies/parse",
+        json={"url": VLESS_URL},
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["server"] == "example.com"
+    assert body["port"] == 443
+    assert body["uuid"].startswith("11111111")
+    assert client.get("/api/proxies").json()["configs"] == []
+
+
+def test_activate_and_delete_proxy(client):
+    add_proxy(client)
+
+    activated = client.post(
+        "/api/proxies/activate",
+        json={"name": "TestNode"},
+        headers=csrf_headers(client),
+    )
+    assert activated.status_code == 200
+    assert activated.json()["active"] == "TestNode"
+    assert client.get("/api/proxies").json()["active"] == "TestNode"
+
+    deleted = client.delete(
+        "/api/proxies",
+        params={"name": "TestNode"},
+        headers=csrf_headers(client),
+    )
+    assert deleted.status_code == 200
+    assert client.get("/api/proxies").json()["configs"] == []
+
+
+def test_activate_unknown_proxy_returns_404(client):
+    response = client.post(
+        "/api/proxies/activate",
+        json={"name": "ghost"},
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 404
+
+
+def test_delete_unknown_proxy_returns_404(client):
+    response = client.delete(
+        "/api/proxies",
+        params={"name": "ghost"},
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 404
+
+
+def test_proxy_mutations_require_csrf(client):
+    login(client)
+
+    assert client.post("/api/proxies", json={"url": VLESS_URL}).status_code == 403
+    assert client.post("/api/proxies/activate", json={"name": "x"}).status_code == 403
+    assert client.delete("/api/proxies", params={"name": "x"}).status_code == 403
+
+
+def test_proxies_page(client):
+    assert client.get("/proxies", follow_redirects=False).status_code == 303
+
+    login(client)
+    response = client.get("/proxies")
+
+    assert response.status_code == 200
+    assert "add-form" in response.text
+
+
+# ── Gateway ──────────────────────────────────────────────────────────────────
+
+def test_gateway_start_requires_active_config(client):
+    response = client.post(
+        "/api/gateway/start",
+        json={},
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 409
+
+
+def test_gateway_start_and_stop(client, fakes):
+    add_proxy(client)
+    client.post(
+        "/api/proxies/activate",
+        json={"name": "TestNode"},
+        headers=csrf_headers(client),
+    )
+
+    started = client.post(
+        "/api/gateway/start",
+        json={"server_ip": "1.2.3.4"},
+        headers=csrf_headers(client),
+    )
+
+    assert started.status_code == 200
+    body = started.json()
+    assert body["result"]["singbox"] == "started"
+    assert body["status"]["running"] is True
+    assert body["status"]["server_ip"] == "1.2.3.4"
+    assert fakes.singbox.running and fakes.wireguard.running and fakes.routing.active
+
+    stopped = client.post(
+        "/api/gateway/stop",
+        json={},
+        headers=csrf_headers(client),
+    )
+
+    assert stopped.status_code == 200
+    assert stopped.json()["status"]["running"] is False
+    assert not fakes.singbox.running
+
+
+def test_gateway_restart_keeps_server_ip(client, fakes):
+    add_proxy(client)
+    client.post(
+        "/api/proxies/activate",
+        json={"name": "TestNode"},
+        headers=csrf_headers(client),
+    )
+    client.post(
+        "/api/gateway/start",
+        json={"server_ip": "5.6.7.8"},
+        headers=csrf_headers(client),
+    )
+
+    response = client.post(
+        "/api/gateway/restart",
+        json={},
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"]["server_ip"] == "5.6.7.8"
+    assert fakes.singbox.running
+
+
+def test_gateway_unknown_action_returns_404(client):
+    response = client.post(
+        "/api/gateway/bogus",
+        json={},
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 404
+
+
+def test_gateway_environment_error_returns_500(client, fakes):
+    add_proxy(client)
+    client.post(
+        "/api/proxies/activate",
+        json={"name": "TestNode"},
+        headers=csrf_headers(client),
+    )
+    fakes.singbox.fail_on_start = "sing-box exploded"
+
+    response = client.post(
+        "/api/gateway/start",
+        json={"server_ip": "1.2.3.4"},
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 500
+    assert "sing-box exploded" in response.json()["detail"]

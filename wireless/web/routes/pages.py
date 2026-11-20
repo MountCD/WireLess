@@ -7,16 +7,25 @@ from wireless.web.deps import current_session
 router = APIRouter()
 
 
-@router.get("/")
-async def dashboard(request: Request):
+def _page(request: Request, template: str):
     session = current_session(request)
     if request.app.state.auth_enabled and session is None:
         return RedirectResponse("/login", status_code=303)
     return request.app.state.templates.TemplateResponse(
         request,
-        "dashboard.html",
+        template,
         {"csrf": session.csrf if session else ""},
     )
+
+
+@router.get("/")
+async def dashboard(request: Request):
+    return _page(request, "dashboard.html")
+
+
+@router.get("/proxies")
+async def proxies(request: Request):
+    return _page(request, "proxies.html")
 
 
 @router.get("/login")
