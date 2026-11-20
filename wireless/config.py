@@ -98,8 +98,10 @@ WG_CONFIG_DIR     = "/etc/wireless/wireguard/"
 WG_SERVER_CONF    = "/etc/wireless/wireguard/wg0.conf"
 
 # ── State / data ────────────────────────────────────────────────────────────
-STATE_FILE   = "/etc/wireless/state.json"
-CONFIGS_FILE = "/etc/wireless/configs.json"
+STATE_FILE         = "/etc/wireless/state.json"
+CONFIGS_FILE       = "/etc/wireless/configs.json"
+SUBSCRIPTIONS_FILE = "/etc/wireless/subscriptions.json"
+LOCK_FILE          = "/etc/wireless/.lock"
 
 # ── Routing / networking ─────────────────────────────────────────────────────
 ROUTE_TABLE    = 100

@@ -149,6 +149,9 @@ python3 -m py_compile \
     "${SCRIPT_DIR}/wireless/generators/singbox.py" \
     "${SCRIPT_DIR}/wireless/generators/wireguard.py" \
     "${SCRIPT_DIR}/wireless/models.py" \
+    "${SCRIPT_DIR}/wireless/store.py" \
+    "${SCRIPT_DIR}/wireless/services.py" \
+    "${SCRIPT_DIR}/wireless/config.py" \
     "${SCRIPT_DIR}/wireless/cli.py"
 
 # The console script imports the package; verify it works outside the repo too.
