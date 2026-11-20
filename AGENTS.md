@@ -61,6 +61,20 @@ mangle-цепочка `WIRELESS_PROXY` с TPROXY, `ip rule fwmark 1 table 100`,
   `py_compile` дублируются в `install.sh` и `install-arch.sh` — новый `.py`
   добавляйте во все места (путь CLI теперь `wireless/cli.py`).
 
+## Web UI
+
+- `wireless/web/` — FastAPI-приложение; зависимости опциональны
+  (`pip install 'wireless[web]'`), поэтому импорт `wireless.web.app` ленивый:
+  `wireless --help` работает без fastapi.
+- `wireless web [--host 127.0.0.1] [--port 8787] [--set-password] [--no-auth]`.
+  Не-loopback bind без пароля запрещён (`web/bind.py`).
+- `web/auth.py` — stdlib: scrypt-хэш пароля и HMAC-подпись cookie в
+  `/etc/wireless/web.json` (`0600`), лимитер логина в памяти. Шаблоны и статика
+  в `web/templates`/`web/static`; CSP запрещает inline-скрипты и стили.
+- Страницы рендерятся Jinja2, данные тянет `web/static/app.js` через
+  `/api/status`. Мутации требуют заголовок `X-CSRF-Token` (значение из
+  `<meta name="csrf-token">`) и same-origin `Origin`.
+
 ## Грабли
 
 - TPROXY-правила заданы дважды: PostUp/PostDown в `generators/wireguard.py` и

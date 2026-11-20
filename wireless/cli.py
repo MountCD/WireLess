@@ -278,6 +278,83 @@ def client(qr: bool, save: Optional[str], index: int):
             click.echo("❌ qrcode not installed. Run: pip install qrcode[pil]", err=True)
 
 
+# ── web ──────────────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.option("--host", default="127.0.0.1", show_default=True, help="Bind address.")
+@click.option("--port", default=8787, show_default=True, type=int, help="Bind port.")
+@click.option(
+    "--set-password",
+    "set_password_flag",
+    is_flag=True,
+    help="Set the admin password interactively and exit.",
+)
+@click.option(
+    "--no-auth",
+    is_flag=True,
+    help="Disable authentication (loopback bind only).",
+)
+def web(host: str, port: int, set_password_flag: bool, no_auth: bool):
+    """Run the local web UI (http://127.0.0.1:8787 by default)."""
+    try:
+        from wireless.web.auth import WebAuth
+        from wireless.web.bind import check_bind
+    except ImportError as exc:
+        _fail(
+            f"❌ Web UI dependencies are missing: {exc}\n"
+            "   Install them with: pip install 'wireless[web]'"
+        )
+
+    auth = WebAuth()
+
+    if set_password_flag:
+        password = click.prompt(
+            "New admin password", hide_input=True, confirmation_prompt=True
+        )
+        try:
+            auth.set_password(password)
+        except ValueError as exc:
+            _fail(f"❌ {exc}")
+        except PermissionError:
+            _fail("❌ Cannot write /etc/wireless/web.json — run this command as root.")
+        click.echo("✅ Password updated.")
+        return
+
+    try:
+        configured = auth.is_configured()
+    except PermissionError:
+        _fail("❌ Cannot read /etc/wireless/web.json — run the web UI as root.")
+
+    problem = check_bind(host, no_auth=no_auth, configured=configured)
+    if problem:
+        _fail(problem)
+
+    if no_auth:
+        click.echo(f"🔓 Web UI: http://{host}:{port} (authentication disabled)")
+    elif configured:
+        click.echo(f"🔐 Web UI: http://{host}:{port}")
+    else:
+        try:
+            generated = auth.ensure_configured()
+        except PermissionError:
+            _fail("❌ Cannot write /etc/wireless/web.json — run the web UI as root.")
+        click.echo("🔐 Generated admin password (shown only once):")
+        click.echo(f"   {generated}")
+        click.echo("   Change it with: wireless web --set-password")
+
+    try:
+        import uvicorn
+
+        from wireless.web.app import create_app
+    except ImportError as exc:
+        _fail(
+            f"❌ Web UI dependencies are missing: {exc}\n"
+            "   Install them with: pip install 'wireless[web]'"
+        )
+
+    uvicorn.run(create_app(auth=auth, auth_enabled=not no_auth), host=host, port=port)
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():

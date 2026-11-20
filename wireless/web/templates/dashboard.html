@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}WireLess — статус{% endblock %}
+{% block body %}
+<header class="topbar">
+  <h1>WireLess</h1>
+  <div class="topbar-actions">
+    <span id="updated" class="muted"></span>
+    <button id="logout" class="ghost" type="button">Выйти</button>
+  </div>
+</header>
+
+<main class="content">
+  <section class="cards">
+    <article class="card">
+      <h2>Активный конфиг</h2>
+      <p id="active" class="value">—</p>
+    </article>
+    <article class="card">
+      <h2>Server IP</h2>
+      <p id="server-ip" class="value">—</p>
+    </article>
+    <article class="card">
+      <h2>Конфигов сохранено</h2>
+      <p id="configs" class="value">—</p>
+    </article>
+    <article class="card">
+      <h2>Шлюз</h2>
+      <p id="running" class="value" data-state="unknown">—</p>
+    </article>
+  </section>
+
+  <section class="panel">
+    <h2>Компоненты</h2>
+    <div class="row">
+      <span>WireGuard</span>
+      <span id="wg" class="badge" data-state="unknown">—</span>
+    </div>
+    <div class="row">
+      <span>sing-box</span>
+      <span id="sb" class="badge" data-state="unknown">—</span>
+    </div>
+    <div class="row">
+      <span>TPROXY routing</span>
+      <span id="routing" class="badge" data-state="unknown">—</span>
+    </div>
+    <div class="row">
+      <span class="muted">Бинарник sing-box</span>
+      <span id="sb-binary" class="mono">—</span>
+    </div>
+  </section>
+
+  <p id="status-error" class="error" hidden></p>
+</main>
+{% endblock %}
