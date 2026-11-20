@@ -1,0 +1,8 @@
+.SRCINFO
+.example.json
+
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.egg-info/

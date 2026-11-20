@@ -1,0 +1,33 @@
+[Unit]
+Description=WireLess — WireGuard proxy gateway (sing-box + WireGuard)
+Documentation=https://github.com/YourUser/WireLess
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/wireless start
+ExecStop=/usr/bin/wireless stop
+ExecReload=/usr/bin/wireless restart
+RemainAfterExit=yes
+
+# Needs root to manage WireGuard interfaces and iptables
+User=root
+Group=root
+
+# State and config dirs are owned by root
+ReadWritePaths=/etc/wireless
+
+# Allow iptables / WireGuard / ip route
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
